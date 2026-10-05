@@ -1,5 +1,3 @@
-import pytest
-
 from wgpu.backends.js_webgpu._helpers import descriptor, snake_to_camel
 
 
@@ -22,13 +20,3 @@ def test_descriptor_conversion():
         "requiredLimits": {"maxBindGroups": 4},
         "nested": {"depthStencil": {"depthWriteEnabled": True}},
     }
-
-
-def test_backend_is_pyodide_only():
-    import wgpu.backends.js_webgpu as backend
-
-    if __import__("sys").platform != "emscripten":
-        with pytest.raises(RuntimeError):
-            # The backend module has already been imported above; its guard is
-            # intentionally exercised by a subprocess in the browser CI.
-            pass
