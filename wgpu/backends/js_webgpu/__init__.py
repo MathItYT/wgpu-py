@@ -165,6 +165,7 @@ class GPUTexture(_Base, classes.GPUTexture):
     def __init__(self, label, internal, device, info): classes.GPUTexture.__init__(self, label, internal, device, info)
     def create_view(self, **kwargs):
         return GPUTextureView(kwargs.get("label", ""), self._internal.createView(to_js_value(descriptor(**kwargs))), self._device, self, self._size)
+
     def destroy(self): self._internal.destroy()
 
 
