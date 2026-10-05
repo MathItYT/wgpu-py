@@ -248,43 +248,92 @@ class GPUCommandEncoder(_Base, classes.GPUCommandEncoder):
 
 
 class _Pass(_Base):
-    def _call_js(self, name, *args): return getattr(self._internal, snake_to_camel(name))(*(to_js_value(x) for x in args))
+    def set_pipeline(self, pipeline):
+        self._internal.setPipeline(to_js_value(pipeline))
+
+    def set_bind_group(self, index, bind_group, dynamic_offsets_data=(), dynamic_offsets_data_start=None, dynamic_offsets_data_length=None):
+        offsets = to_js_value(dynamic_offsets_data)
+        if dynamic_offsets_data_start is not None:
+            start = dynamic_offsets_data_start
+            end = None if dynamic_offsets_data_length is None else start + dynamic_offsets_data_length
+            offsets = offsets[start:end]
+        self._internal.setBindGroup(index, to_js_value(bind_group), offsets)
+
+    def set_immediates(self, range_offset, data, data_offset=0, data_size=None):
+        size = len(memoryview(data).cast("B")) - data_offset if data_size is None else data_size
+        raw = memoryview(data).cast("B")[data_offset:data_offset + size]
+        self._internal.setImmediates(range_offset, raw)
+
+    def push_debug_group(self, group_label):
+        self._internal.pushDebugGroup(group_label)
+
+    def pop_debug_group(self):
+        self._internal.popDebugGroup()
+
+    def insert_debug_marker(self, marker_label):
+        self._internal.insertDebugMarker(marker_label)
+
+    def set_index_buffer(self, buffer, index_format, offset=0, size=None):
+        args = [to_js_value(buffer), index_format, offset]
+        if size is not None:
+            args.append(size)
+        self._internal.setIndexBuffer(*args)
+
+    def set_vertex_buffer(self, slot, buffer, offset=0, size=None):
+        args = [slot, to_js_value(buffer), offset]
+        if size is not None:
+            args.append(size)
+        self._internal.setVertexBuffer(*args)
+
+    def draw(self, vertex_count, instance_count=1, first_vertex=0, first_instance=0):
+        self._internal.draw(vertex_count, instance_count, first_vertex, first_instance)
+
+    def draw_indexed(self, index_count, instance_count=1, first_index=0, base_vertex=0, first_instance=0):
+        self._internal.drawIndexed(index_count, instance_count, first_index, base_vertex, first_instance)
+
+    def draw_indirect(self, indirect_buffer, indirect_offset):
+        self._internal.drawIndirect(to_js_value(indirect_buffer), indirect_offset)
+
+    def draw_indexed_indirect(self, indirect_buffer, indirect_offset):
+        self._internal.drawIndexedIndirect(to_js_value(indirect_buffer), indirect_offset)
+
+    def set_viewport(self, x, y, width, height, min_depth, max_depth):
+        self._internal.setViewport(x, y, width, height, min_depth, max_depth)
+
+    def set_scissor_rect(self, x, y, width, height):
+        self._internal.setScissorRect(x, y, width, height)
+
+    def set_blend_constant(self, color):
+        self._internal.setBlendConstant(to_js_value(color))
+
+    def set_stencil_reference(self, reference):
+        self._internal.setStencilReference(reference)
+
+    def execute_bundles(self, bundles):
+        self._internal.executeBundles(to_js_value(bundles))
+
+    def begin_occlusion_query(self, query_index):
+        self._internal.beginOcclusionQuery(query_index)
+
+    def end_occlusion_query(self):
+        self._internal.endOcclusionQuery()
+
+    def dispatch_workgroups(self, x, y=1, z=1):
+        self._internal.dispatchWorkgroups(x, y, z)
+
+    def dispatch_workgroups_indirect(self, indirect_buffer, indirect_offset):
+        self._internal.dispatchWorkgroupsIndirect(to_js_value(indirect_buffer), indirect_offset)
+
+    def end(self):
+        self._internal.end()
 
 
 class GPUComputePassEncoder(_Pass, classes.GPUComputePassEncoder):
-    def set_pipeline(self, pipeline): self._internal.setPipeline(to_js_value(pipeline))
-    def set_bind_group(self, index, bind_group, dynamic_offsets_data=(), dynamic_offsets_data_start=None, dynamic_offsets_data_length=None):
-        self._internal.setBindGroup(index, to_js_value(bind_group), to_js_value(dynamic_offsets_data))
-    def dispatch_workgroups(self, x, y=1, z=1): self._internal.dispatchWorkgroups(x, y, z)
-    def dispatch_workgroups_indirect(self, indirect_buffer, indirect_offset):
-        self._internal.dispatchWorkgroupsIndirect(to_js_value(indirect_buffer), indirect_offset)
-    def end(self): self._internal.end()
+    pass
 
 
 class GPURenderPassEncoder(_Pass, classes.GPURenderPassEncoder):
-    def set_pipeline(self, pipeline): self._internal.setPipeline(to_js_value(pipeline))
-    def set_bind_group(self, index, bind_group, dynamic_offsets_data=(), dynamic_offsets_data_start=None, dynamic_offsets_data_length=None): self._internal.setBindGroup(index, to_js_value(bind_group), to_js_value(dynamic_offsets_data))
-    def set_vertex_buffer(self, slot, buffer, offset=0, size=None):
-        args = [slot, to_js_value(buffer), offset] + ([] if size is None else [size]); self._internal.setVertexBuffer(*args)
-    def set_index_buffer(self, buffer, index_format, offset=0, size=None):
-        args = [to_js_value(buffer), index_format, offset] + ([] if size is None else [size]); self._internal.setIndexBuffer(*args)
-    def draw(self, vertex_count, instance_count=1, first_vertex=0, first_instance=0): self._internal.draw(vertex_count, instance_count, first_vertex, first_instance)
-    def draw_indexed(self, index_count, instance_count=1, first_index=0, base_vertex=0, first_instance=0): self._internal.drawIndexed(index_count, instance_count, first_index, base_vertex, first_instance)
-    def set_viewport(self, x, y, width, height, min_depth, max_depth): self._internal.setViewport(x, y, width, height, min_depth, max_depth)
-    def set_scissor_rect(self, x, y, width, height): self._internal.setScissorRect(x, y, width, height)
-    def set_blend_constant(self, color): self._internal.setBlendConstant(to_js_value(color))
-    def set_stencil_reference(self, reference): self._internal.setStencilReference(reference)
-    def draw_indirect(self, indirect_buffer, indirect_offset):
-        self._internal.drawIndirect(to_js_value(indirect_buffer), indirect_offset)
-    def draw_indexed_indirect(self, indirect_buffer, indirect_offset):
-        self._internal.drawIndexedIndirect(to_js_value(indirect_buffer), indirect_offset)
-    def execute_bundles(self, bundles):
-        self._internal.executeBundles(to_js_value(bundles))
-    def begin_occlusion_query(self, query_index):
-        self._internal.beginOcclusionQuery(query_index)
-    def end_occlusion_query(self):
-        self._internal.endOcclusionQuery()
-    def end(self): self._internal.end()
+    pass
 
 
 class GPURenderBundle(_Base, classes.GPURenderBundle): pass
