@@ -29,7 +29,18 @@ def to_js_value(value: Any) -> Any:
     if dataclasses.is_dataclass(value):
         value = {field.name: getattr(value, field.name) for field in dataclasses.fields(value)}
     if isinstance(value, Mapping):
-        return {snake_to_camel(str(k)): to_js_value(v) for k, v in value.items() if v is not None}
+        # Pyodide 0.29+ converts Python dictionaries to JavaScript Maps by
+        # default. WebGPU descriptors are WebIDL dictionaries and therefore
+        # require ordinary JavaScript Objects (not Maps).
+        from js import Object
+        from pyodide.ffi import to_js
+
+        normalized = {
+            snake_to_camel(str(k)): to_js_value(v)
+            for k, v in value.items()
+            if v is not None
+        }
+        return to_js(normalized, dict_converter=Object.fromEntries)
     if isinstance(value, (list, tuple, set, frozenset)):
         return [to_js_value(v) for v in value]
     return value
