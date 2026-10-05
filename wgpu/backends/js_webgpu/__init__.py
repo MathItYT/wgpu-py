@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from typing import Any
 
 from ... import _classes as classes
@@ -265,5 +264,3 @@ class GPUQuerySet(_Base, classes.GPUQuerySet):
 gpu = GPU()
 _register_backend(gpu)
 
-if sys.platform != "emscripten":
-    raise RuntimeError("wgpu.backends.js_webgpu requires a Pyodide runtime.")
