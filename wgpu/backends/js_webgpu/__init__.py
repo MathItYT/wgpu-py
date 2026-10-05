@@ -212,8 +212,37 @@ class GPUCommandBuffer(_Base, classes.GPUCommandBuffer): pass
 class GPUCommandEncoder(_Base, classes.GPUCommandEncoder):
     def begin_compute_pass(self, *, label="", timestamp_writes=None):
         return GPUComputePassEncoder(label, self._internal.beginComputePass(to_js_value(descriptor(label=label, timestamp_writes=timestamp_writes))), self._device)
+
     def begin_render_pass(self, *, label="", color_attachments, depth_stencil_attachment=None, occlusion_query_set=None, timestamp_writes=None, max_draw_count=50000000):
-        return GPURenderPassEncoder(label, self._internal.beginRenderPass(to_js_value(descriptor(label=label, color_attachments=color_attachments, depth_stencil_attachment=depth_stencil_attachment, occlusion_query_set=occlusion_query_set, timestamp_writes=timestamp_writes, max_draw_count=max_draw_count))), self._device)
+        return GPURenderPassEncoder(label, self._internal.beginRenderPass(to_js_value(descriptor(
+            label=label, color_attachments=color_attachments, depth_stencil_attachment=depth_stencil_attachment,
+            occlusion_query_set=occlusion_query_set, timestamp_writes=timestamp_writes, max_draw_count=max_draw_count
+        ))), self._device)
+
+    def copy_buffer_to_buffer(self, source, source_offset, destination, destination_offset, size):
+        self._internal.copyBufferToBuffer(to_js_value(source), source_offset, to_js_value(destination), destination_offset, size)
+
+    def copy_buffer_to_texture(self, source, destination, copy_size):
+        self._internal.copyBufferToTexture(to_js_value(source), to_js_value(destination), to_js_value(copy_size))
+
+    def copy_texture_to_buffer(self, source, destination, copy_size):
+        self._internal.copyTextureToBuffer(to_js_value(source), to_js_value(destination), to_js_value(copy_size))
+
+    def copy_texture_to_texture(self, source, destination, copy_size):
+        self._internal.copyTextureToTexture(to_js_value(source), to_js_value(destination), to_js_value(copy_size))
+
+    def clear_buffer(self, buffer, offset=0, size=None):
+        args = [to_js_value(buffer), offset]
+        if size is not None:
+            args.append(size)
+        self._internal.clearBuffer(*args)
+
+    def resolve_query_set(self, query_set, first_query, query_count, destination, destination_offset):
+        self._internal.resolveQuerySet(to_js_value(query_set), first_query, query_count, to_js_value(destination), destination_offset)
+
+    def write_timestamp(self, query_set, query_index):
+        self._internal.writeTimestamp(to_js_value(query_set), query_index)
+
     def finish(self, *, label=""):
         return GPUCommandBuffer(label, self._internal.finish(to_js_value(descriptor(label=label))), self._device)
 
@@ -224,8 +253,11 @@ class _Pass(_Base):
 
 class GPUComputePassEncoder(_Pass, classes.GPUComputePassEncoder):
     def set_pipeline(self, pipeline): self._internal.setPipeline(to_js_value(pipeline))
-    def set_bind_group(self, index, bind_group, dynamic_offsets_data=(), dynamic_offsets_data_start=None, dynamic_offsets_data_length=None): self._internal.setBindGroup(index, to_js_value(bind_group), to_js_value(dynamic_offsets_data))
+    def set_bind_group(self, index, bind_group, dynamic_offsets_data=(), dynamic_offsets_data_start=None, dynamic_offsets_data_length=None):
+        self._internal.setBindGroup(index, to_js_value(bind_group), to_js_value(dynamic_offsets_data))
     def dispatch_workgroups(self, x, y=1, z=1): self._internal.dispatchWorkgroups(x, y, z)
+    def dispatch_workgroups_indirect(self, indirect_buffer, indirect_offset):
+        self._internal.dispatchWorkgroupsIndirect(to_js_value(indirect_buffer), indirect_offset)
     def end(self): self._internal.end()
 
 
@@ -242,6 +274,16 @@ class GPURenderPassEncoder(_Pass, classes.GPURenderPassEncoder):
     def set_scissor_rect(self, x, y, width, height): self._internal.setScissorRect(x, y, width, height)
     def set_blend_constant(self, color): self._internal.setBlendConstant(to_js_value(color))
     def set_stencil_reference(self, reference): self._internal.setStencilReference(reference)
+    def draw_indirect(self, indirect_buffer, indirect_offset):
+        self._internal.drawIndirect(to_js_value(indirect_buffer), indirect_offset)
+    def draw_indexed_indirect(self, indirect_buffer, indirect_offset):
+        self._internal.drawIndexedIndirect(to_js_value(indirect_buffer), indirect_offset)
+    def execute_bundles(self, bundles):
+        self._internal.executeBundles(to_js_value(bundles))
+    def begin_occlusion_query(self, query_index):
+        self._internal.beginOcclusionQuery(query_index)
+    def end_occlusion_query(self):
+        self._internal.endOcclusionQuery()
     def end(self): self._internal.end()
 
 
