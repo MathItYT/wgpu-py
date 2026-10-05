@@ -344,10 +344,26 @@ class GPURenderBundleEncoder(_Pass, classes.GPURenderBundleEncoder):
 class GPUQueue(_Base, classes.GPUQueue):
     def submit(self, command_buffers): self._internal.submit(to_js_value(command_buffers))
     def write_buffer(self, buffer, buffer_offset, data, data_offset=0, size=None):
-        raw = memoryview(data).cast("B"); end = raw.nbytes if size is None else data_offset + size
-        self._internal.writeBuffer(to_js_value(buffer), buffer_offset, raw[data_offset:end])
+        from pyodide.ffi import to_js
+
+        raw = memoryview(data).cast("B")
+        end = raw.nbytes if size is None else data_offset + size
+        payload = raw[data_offset:end]
+        self._internal.writeBuffer(
+            to_js_value(buffer),
+            buffer_offset,
+            to_js(payload),
+        )
     def write_texture(self, destination, data, data_layout, size):
-        self._internal.writeTexture(to_js_value(destination), memoryview(data).cast("B"), to_js_value(data_layout), to_js_value(size))
+        from pyodide.ffi import to_js
+
+        payload = memoryview(data).cast("B")
+        self._internal.writeTexture(
+            to_js_value(destination),
+            to_js(payload),
+            to_js_value(data_layout),
+            to_js_value(size),
+        )
 
     def read_buffer(self, buffer, buffer_offset=0, size=None):
         raise NotImplementedError(
