@@ -20,3 +20,14 @@ def test_descriptor_conversion():
         "requiredLimits": {"maxBindGroups": 4},
         "nested": {"depthStencil": {"depthWriteEnabled": True}},
     }
+
+
+def test_rendercanvas_context_api_shape():
+    from wgpu.backends.js_webgpu import GPUCanvasContext
+
+    assert hasattr(GPUCanvasContext, "configure")
+    assert hasattr(GPUCanvasContext, "unconfigure")
+    assert hasattr(GPUCanvasContext, "get_current_texture")
+    assert hasattr(GPUCanvasContext, "get_preferred_format")
+    assert hasattr(GPUCanvasContext, "present")
+    assert hasattr(GPUCanvasContext, "set_physical_size")
