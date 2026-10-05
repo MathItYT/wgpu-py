@@ -471,7 +471,3 @@ class GPUCanvasContext:
         self._config = None
 
 
-
-# Instantiate and register this backend. Pyodide selects this module automatically.
-gpu = GPU()
-_register_backend(gpu)
