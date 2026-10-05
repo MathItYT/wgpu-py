@@ -350,30 +350,10 @@ class GPUQueue(_Base, classes.GPUQueue):
         self._internal.writeTexture(to_js_value(destination), memoryview(data).cast("B"), to_js_value(data_layout), to_js_value(size))
 
     def read_buffer(self, buffer, buffer_offset=0, size=None):
-        if size is None:
-            size = buffer.size - buffer_offset
-        temp = self._device.create_buffer(
-            size=(size + 3) & ~3,
-            usage=0x0008 | 0x0002,
-            mapped_at_creation=False,
+        raise NotImplementedError(
+            "Synchronous queue.read_buffer() is unavailable in Pyodide; use "
+            "GPUBuffer.map_async() after submitting a COPY_SRC buffer."
         )
-        encoder = self._device.create_command_encoder()
-        encoder.copy_buffer_to_buffer(buffer, buffer_offset, temp, 0, size)
-        self.submit([encoder.finish()])
-        return self._read_mapped_after_submit(temp, size)
-
-    def _read_mapped_after_submit(self, buffer, size):
-        return make_promise(
-            "queue_read_buffer",
-            self._internal.onSubmittedWorkDone(),
-            handler=lambda _: self._map_and_read(buffer, size),
-        )
-
-    def _map_and_read(self, buffer, size):
-        return buffer.map_async(0x0001, 0, (size + 3) & ~3).sync_wait() or buffer.read_mapped(0, size)
-
-    def on_submitted_work_done_async(self):
-        return make_promise("queue_work_done", self._internal.onSubmittedWorkDone(), handler=lambda _: None)
 
 
 class GPUQuerySet(_Base, classes.GPUQuerySet):
