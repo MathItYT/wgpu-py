@@ -166,7 +166,9 @@ class GPUTexture(_Base, classes.GPUTexture):
     def destroy(self): self._internal.destroy()
 
 
-class GPUTextureView(_Base, classes.GPUTextureView): pass
+class GPUTextureView(_Base, classes.GPUTextureView):
+    def __init__(self, label, internal, device, texture, size):
+        classes.GPUTextureView.__init__(self, label, internal, device, texture, size)
 class GPUSampler(_Base, classes.GPUSampler): pass
 class GPUBindGroupLayout(_Base, classes.GPUBindGroupLayout): pass
 class GPUBindGroup(_Base, classes.GPUBindGroup): pass
