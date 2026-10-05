@@ -15,14 +15,39 @@ def _features(obj):
 
 
 def _limits(obj):
-    # WebGPU exposes GPUSizeLimits fields in camelCase (e.g.
-    # minUniformBufferOffsetAlignment), while wgpu's public Python API uses
-    # hyphen-separated limit names.
-    limits = js_record_to_dict(js_get(obj, "limits", {}))
-    return {
-        re.sub(r"([A-Z])", lambda m: "-" + m.group(1).lower(), key): value
-        for key, value in limits.items()
-    }
+    # GPUSizeLimits is a WebIDL object, not a JavaScript record. Its fields
+    # live on the prototype, so Mapping conversion does not expose them.
+    limit_names = (
+        "maxTextureDimension1D", "maxTextureDimension2D", "maxTextureDimension3D",
+        "maxTextureArrayLayers", "maxBindGroups", "maxBindGroupsPlusVertexBuffers",
+        "maxBindingsPerBindGroup", "maxDynamicUniformBuffersPerPipelineLayout",
+        "maxDynamicStorageBuffersPerPipelineLayout", "maxSampledTexturesPerShaderStage",
+        "maxSamplersPerShaderStage", "maxStorageBuffersPerShaderStage",
+        "maxStorageTexturesPerShaderStage", "maxUniformBuffersPerShaderStage",
+        "maxUniformBufferBindingSize", "maxStorageBufferBindingSize",
+        "minUniformBufferOffsetAlignment", "minStorageBufferOffsetAlignment",
+        "maxVertexBuffers", "maxBufferSize", "maxVertexAttributes",
+        "maxVertexBufferArrayStride", "maxInterStageShaderComponents",
+        "maxInterStageShaderVariables", "maxColorAttachments",
+        "maxColorAttachmentBytesPerSample", "maxComputeWorkgroupStorageSize",
+        "maxComputeInvocationsPerWorkgroup", "maxComputeWorkgroupSizeX",
+        "maxComputeWorkgroupSizeY", "maxComputeWorkgroupSizeZ",
+        "maxComputeWorkgroupsPerDimension",
+    )
+    limits = {}
+    raw_limits = js_get(obj, "limits", None)
+    if raw_limits is None:
+        return limits
+    for camel_name in limit_names:
+        try:
+            value = getattr(raw_limits, camel_name)
+        except (AttributeError, TypeError):
+            continue
+        if value is None:
+            continue
+        key = re.sub(r"([A-Z])", lambda m: "-" + m.group(1).lower(), camel_name).lstrip("-")
+        limits[key] = int(value)
+    return limits
 
 
 def _adapter_info(adapter):
