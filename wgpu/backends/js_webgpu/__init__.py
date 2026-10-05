@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+import re
 
 from ... import _classes as classes
 from ..._async import GPUPromise
@@ -14,7 +15,14 @@ def _features(obj):
 
 
 def _limits(obj):
-    return js_record_to_dict(js_get(obj, "limits", {}))
+    # WebGPU exposes GPUSizeLimits fields in camelCase (e.g.
+    # minUniformBufferOffsetAlignment), while wgpu's public Python API uses
+    # snake_case. Normalize the record before handing it to GPUDevice.
+    limits = js_record_to_dict(js_get(obj, "limits", {}))
+    return {
+        re.sub(r"([A-Z])", lambda m: "_" + m.group(1).lower(), key): value
+        for key, value in limits.items()
+    }
 
 
 def _adapter_info(adapter):
