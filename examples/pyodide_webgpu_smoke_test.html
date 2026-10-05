@@ -8,10 +8,11 @@ import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v0.29.0/full/pyodi
 
 const pyodide = await loadPyodide();
 await pyodide.loadPackage("micropip");
+const wheel = new URL(new URLSearchParams(location.search).get("wheel") || "./dist/wgpu.whl", location.href).href;
 await pyodide.runPythonAsync(`
 import micropip
-await micropip.install("wgpu")
-`);
+await micropip.install("${WGPU_WHEEL_URL}")
+`.replace("${WGPU_WHEEL_URL}", wheel));
 
 await pyodide.runPythonAsync(`
 import wgpu
