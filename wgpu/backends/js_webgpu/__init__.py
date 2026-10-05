@@ -365,72 +365,108 @@ _register_backend(gpu)
 
 
 
-class GPUCanvasContext(classes.GPUCanvasContext):
-    """Browser HTMLCanvasElement/OffscreenCanvas WebGPU context."""
+class GPUCanvasContext:
+    """rendercanvas-facing WebGPU presentation context.
+
+    This object intentionally mirrors the small context API expected by
+    rendercanvas.WgpuContextToScreen while delegating presentation to the
+    browser's native GPUCanvasContext.
+    """
 
     def __init__(self, present_info):
-        super().__init__(present_info)
-        canvas = present_info.get("window") if isinstance(present_info, dict) else present_info
-        if canvas is None:
-            raise ValueError("Pyodide GPUCanvasContext requires present_info['window'] to be a canvas.")
-        canvas = getattr(canvas, "_internal", canvas)
-        self._canvas = canvas
-        self._context = canvas.getContext("webgpu")
+        self._present_info = present_info
+        self._canvas = present_info["window"]
+        self._context = self._canvas.getContext("webgpu")
         if self._context is None:
             raise RuntimeError("The supplied canvas does not provide a WebGPU context.")
-        try:
-            self.set_physical_size(int(canvas.width), int(canvas.height))
-        except (AttributeError, TypeError):
-            pass
+        self._config = None
+        self._physical_size = (0, 0)
+
+    def set_physical_size(self, width, height):
+        self._physical_size = (int(width), int(height))
 
     @property
-    def canvas(self):
-        return self._canvas
+    def physical_size(self):
+        return self._physical_size
 
-    def _get_capabilities_screen(self, adapter):
-        preferred = str(require_browser_webgpu().getPreferredCanvasFormat())
-        formats = [preferred]
-        alternate = "rgba8unorm" if preferred == "bgra8unorm" else "bgra8unorm"
-        if alternate not in formats:
-            formats.append(alternate)
-        return {
-            "formats": formats,
-            "view_formats": formats,
-            "usages": 0x10,
-            "alpha_modes": ["opaque", "premultiplied"],
-            "present_modes": ["fifo"],
-        }
+    def get_preferred_format(self, adapter=None):
+        return str(require_browser_webgpu().getPreferredCanvasFormat())
 
-    def _configure_screen(self, *, device, format, usage, view_formats, color_space, tone_mapping, alpha_mode):
-        self._context.configure(to_js_value({
+    def configure(self, *, device, format=None, usage=0x10, view_formats=(), alpha_mode="opaque", **kwargs):
+        if format is None:
+            format = self.get_preferred_format(getattr(device, "adapter", None))
+
+        if isinstance(usage, str):
+            import wgpu
+            bits = 0
+            for name in usage.replace("|", " ").split():
+                bits |= wgpu.TextureUsage[name]
+            usage = bits
+
+        js_config = {
             "device": to_js_value(device),
             "format": format,
             "usage": usage,
             "viewFormats": list(view_formats),
-            "colorSpace": color_space,
             "alphaMode": alpha_mode,
-        }))
+        }
 
-    def _unconfigure_screen(self):
+        # WebGPU canvas colorSpace/toneMapping are browser features and should
+        # only be sent when explicitly requested.
+        if "color_space" in kwargs and kwargs["color_space"] is not None:
+            js_config["colorSpace"] = kwargs["color_space"]
+        if "tone_mapping" in kwargs and kwargs["tone_mapping"] is not None:
+            js_config["toneMapping"] = to_js_value(kwargs["tone_mapping"])
+
+        self._context.configure(to_js_value(js_config))
+        self._config = {
+            "device": device,
+            "format": format,
+            "usage": usage,
+            "view_formats": tuple(view_formats),
+            "alpha_mode": alpha_mode,
+        }
+
+    def unconfigure(self):
         self._context.unconfigure()
+        self._config = None
 
-    def _create_texture_screen(self):
-        js_texture = self._context.getCurrentTexture()
+    def get_current_texture(self):
+        if self._config is None:
+            raise RuntimeError("Canvas context must be configured before calling get_current_texture().")
+
+        texture = self._context.getCurrentTexture()
         width, height = self._physical_size
+
+        # Browser canvas dimensions are authoritative when rendercanvas has not
+        # supplied a physical size yet.
         if width <= 0 or height <= 0:
-            raise RuntimeError("Cannot get texture for a canvas with zero pixels.")
-        config = self._config
+            width = int(self._canvas.width)
+            height = int(self._canvas.height)
+
         info = {
             "size": (width, height, 1),
             "mip_level_count": 1,
             "sample_count": 1,
             "dimension": "2d",
-            "format": config["format"],
-            "usage": config["usage"],
+            "format": self._config["format"],
+            "usage": self._config["usage"],
             "texture_binding_view_dimension": None,
         }
-        return GPUTexture("current_canvas_texture", js_texture, config["device"], info)
+        return GPUTexture("current_canvas_texture", texture, self._config["device"], info)
 
-    def _present_screen(self):
-        # Browser WebGPU presents the configured canvas automatically.
+    def present(self):
+        # Unlike native window backends, browser WebGPU has no swapBuffers().
+        # Submitting commands is enough; the configured canvas texture is
+        # composited by the browser.
         return None
+
+    def _release(self):
+        try:
+            self.unconfigure()
+        except Exception:
+            pass
+        self._context = None
+        self._canvas = None
+        self._config = None
+
