@@ -26,7 +26,7 @@ gpu = GPU()  # noqa: F405
 # Select the JS backend automatically there; native installations keep their
 # existing explicit backend loading behavior.
 if sys.platform == "emscripten":
-    from .backends import js_webgpu as _js_webgpu_backend
+    from .backends import pyodide as _pyodide_backend
 
 
 def rendercanvas_context_hook(canvas, _):
