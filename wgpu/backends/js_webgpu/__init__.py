@@ -17,10 +17,10 @@ def _features(obj):
 def _limits(obj):
     # WebGPU exposes GPUSizeLimits fields in camelCase (e.g.
     # minUniformBufferOffsetAlignment), while wgpu's public Python API uses
-    # snake_case. Normalize the record before handing it to GPUDevice.
+    # hyphen-separated limit names.
     limits = js_record_to_dict(js_get(obj, "limits", {}))
     return {
-        re.sub(r"([A-Z])", lambda m: "_" + m.group(1).lower(), key): value
+        re.sub(r"([A-Z])", lambda m: "-" + m.group(1).lower(), key): value
         for key, value in limits.items()
     }
 
