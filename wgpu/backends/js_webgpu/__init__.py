@@ -398,6 +398,14 @@ class GPUQueue(_Base, classes.GPUQueue):
             to_js_value(size),
         )
 
+    def copy_external_image_to_texture(self, source, destination, copy_size):
+        """Copy an HTMLVideoElement/Canvas source directly into a GPU texture."""
+        self._internal.copyExternalImageToTexture(
+            to_js_value(source),
+            to_js_value(destination),
+            to_js_value(copy_size),
+        )
+
     def read_buffer(self, buffer, buffer_offset=0, size=None):
         raise NotImplementedError(
             "Synchronous queue.read_buffer() is unavailable in Pyodide; use "
