@@ -6,7 +6,7 @@ import re
 from ... import _classes as classes
 from ..._async import GPUPromise
 from .. import _register_backend
-from ._helpers import descriptor, is_js_null, js_get, js_record_to_dict, make_promise, require_browser_webgpu, snake_to_camel, to_js_value
+from ._helpers import descriptor, is_browser_webgpu_available, is_js_null, js_get, js_record_to_dict, make_promise, require_browser_webgpu, snake_to_camel, to_js_value
 
 
 def _features(obj):
@@ -82,7 +82,18 @@ class GPU:
 
     def request_adapter_async(self, *, feature_level="core", power_preference=None,
                               force_fallback_adapter=False, canvas=None):
-        gpu = require_browser_webgpu()
+        if not is_browser_webgpu_available():
+            async def _no_gpu():
+                return None
+            return make_promise("request_adapter", _no_gpu(), handler=lambda _: None)
+
+        try:
+            gpu = require_browser_webgpu()
+        except Exception:
+            async def _no_gpu():
+                return None
+            return make_promise("request_adapter", _no_gpu(), handler=lambda _: None)
+
         options = {}
         if power_preference is not None:
             options["powerPreference"] = power_preference
@@ -98,18 +109,29 @@ class GPU:
                 return None
             return GPUAdapter(obj, _features(obj), _limits(obj), _adapter_info(obj))
 
-        return make_promise("request_adapter", gpu.requestAdapter(to_js_value(options)), handler=_on_adapter)
+        try:
+            promise_js = gpu.requestAdapter(to_js_value(options))
+            return make_promise("request_adapter", promise_js, handler=_on_adapter)
+        except Exception:
+            async def _no_gpu():
+                return None
+            return make_promise("request_adapter", _no_gpu(), handler=lambda _: None)
 
     def get_preferred_canvas_format(self):
-        return str(require_browser_webgpu().getPreferredCanvasFormat())
+        try:
+            return str(require_browser_webgpu().getPreferredCanvasFormat())
+        except Exception:
+            return "rgba8unorm"
 
     def get_canvas_context(self, present_info):
         return GPUCanvasContext(present_info)
 
     @property
     def wgsl_language_features(self):
-        try: return {str(x) for x in require_browser_webgpu().wgslLanguageFeatures}
-        except (AttributeError, TypeError): return set()
+        try:
+            return {str(x) for x in require_browser_webgpu().wgslLanguageFeatures}
+        except Exception:
+            return set()
 
 
 class GPUAdapter(classes.GPUAdapter):
@@ -482,7 +504,10 @@ class GPUCanvasContext:
         return self._physical_size
 
     def get_preferred_format(self, adapter=None):
-        return str(require_browser_webgpu().getPreferredCanvasFormat())
+        try:
+            return str(require_browser_webgpu().getPreferredCanvasFormat())
+        except Exception:
+            return "rgba8unorm"
 
     def configure(self, *, device, format=None, usage=0x10, view_formats=(), alpha_mode="opaque", **kwargs):
         if format is None:

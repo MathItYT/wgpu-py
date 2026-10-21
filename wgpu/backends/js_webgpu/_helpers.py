@@ -99,10 +99,10 @@ def is_js_null(value: Any) -> bool:
 def is_browser_webgpu_available() -> bool:
     try:
         from js import navigator
-    except ImportError:
+        gpu = getattr(navigator, "gpu", None)
+        return not is_js_null(gpu)
+    except Exception:
         return False
-    gpu = getattr(navigator, "gpu", None)
-    return not is_js_null(gpu)
 
 
 def require_browser_webgpu() -> Any:
