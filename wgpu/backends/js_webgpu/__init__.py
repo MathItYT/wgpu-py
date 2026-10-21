@@ -6,7 +6,7 @@ import re
 from ... import _classes as classes
 from ..._async import GPUPromise
 from .. import _register_backend
-from ._helpers import descriptor, js_get, js_record_to_dict, make_promise, require_browser_webgpu, snake_to_camel, to_js_value
+from ._helpers import descriptor, is_js_null, js_get, js_record_to_dict, make_promise, require_browser_webgpu, snake_to_camel, to_js_value
 
 
 def _features(obj):
@@ -33,6 +33,8 @@ def _limits(obj):
         "maxComputeInvocationsPerWorkgroup", "maxComputeWorkgroupSizeX",
         "maxComputeWorkgroupSizeY", "maxComputeWorkgroupSizeZ",
         "maxComputeWorkgroupsPerDimension",
+        "maxStorageBuffersInVertexStage", "maxStorageTexturesInVertexStage",
+        "maxStorageBuffersInFragmentStage", "maxStorageTexturesInFragmentStage",
     )
     limits = {}
     raw_limits = js_get(obj, "limits", None)
@@ -51,11 +53,26 @@ def _limits(obj):
 
 
 def _adapter_info(adapter):
-    data = js_record_to_dict(js_get(adapter, "info", {}))
+    if is_js_null(adapter):
+        return classes.GPUAdapterInfo({
+            "vendor": "", "architecture": "", "device": "",
+            "description": "", "adapter_type": "unknown", "backend_type": "webgpu",
+        })
+    info_obj = js_get(adapter, "info", {})
+    data = js_record_to_dict(info_obj)
+    is_fallback = bool(
+        js_get(adapter, "isFallbackAdapter", False)
+        or js_get(info_obj, "isFallbackAdapter", False)
+        or data.get("isFallbackAdapter", False)
+    )
+    adapter_type = data.get("adapterType", "") or ("cpu" if is_fallback else "unknown")
     return classes.GPUAdapterInfo({
-        "vendor": data.get("vendor", ""), "architecture": data.get("architecture", ""),
-        "device": data.get("device", ""), "description": data.get("description", ""),
-        "adapter_type": data.get("adapterType", ""), "backend_type": "webgpu",
+        "vendor": data.get("vendor", ""),
+        "architecture": data.get("architecture", ""),
+        "device": data.get("device", ""),
+        "description": data.get("description", ""),
+        "adapter_type": adapter_type,
+        "backend_type": "webgpu",
     })
 
 
@@ -67,12 +84,21 @@ class GPU:
                               force_fallback_adapter=False, canvas=None):
         gpu = require_browser_webgpu()
         options = {}
-        if power_preference is not None: options["powerPreference"] = power_preference
-        if force_fallback_adapter: options["forceFallbackAdapter"] = True
-        if feature_level == "compatibility": options["featureLevel"] = feature_level
-        if canvas is not None: options["canvas"] = getattr(canvas, "_internal", canvas)
-        return make_promise("request_adapter", gpu.requestAdapter(to_js_value(options)),
-                            handler=lambda obj: GPUAdapter(obj, _features(obj), _limits(obj), _adapter_info(obj)))
+        if power_preference is not None:
+            options["powerPreference"] = power_preference
+        if force_fallback_adapter:
+            options["forceFallbackAdapter"] = True
+        if feature_level == "compatibility":
+            options["featureLevel"] = feature_level
+        if canvas is not None:
+            options["canvas"] = getattr(canvas, "_internal", canvas)
+
+        def _on_adapter(obj):
+            if is_js_null(obj):
+                return None
+            return GPUAdapter(obj, _features(obj), _limits(obj), _adapter_info(obj))
+
+        return make_promise("request_adapter", gpu.requestAdapter(to_js_value(options)), handler=_on_adapter)
 
     def get_preferred_canvas_format(self):
         return str(require_browser_webgpu().getPreferredCanvasFormat())
@@ -94,9 +120,18 @@ class GPUAdapter(classes.GPUAdapter):
         raise NotImplementedError("Synchronous API functions are unavailable in Pyodide.")
 
     def request_device_async(self, *, label="", required_features=(), required_limits=None, default_queue=None):
-        desc = descriptor(label=label, required_features=required_features, required_limits=required_limits or {})
-        return make_promise("request_device", self._internal.requestDevice(to_js_value(desc)),
-                            handler=lambda obj: _make_device(obj, self))
+        req_limits = dict(required_limits or {})
+        vs_storage = self._limits.get("max-storage-buffers-in-vertex-stage")
+        if vs_storage is not None and vs_storage > 0 and "maxStorageBuffersInVertexStage" not in req_limits:
+            req_limits["maxStorageBuffersInVertexStage"] = min(int(vs_storage), 4)
+        desc = descriptor(label=label, required_features=required_features, required_limits=req_limits)
+
+        def _on_device(obj):
+            if is_js_null(obj):
+                return None
+            return _make_device(obj, self)
+
+        return make_promise("request_device", self._internal.requestDevice(to_js_value(desc)), handler=_on_device)
 
 
 def _make_device(obj, adapter):

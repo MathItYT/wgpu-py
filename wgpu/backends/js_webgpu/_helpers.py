@@ -89,13 +89,29 @@ def make_promise(title: str, awaitable: Any, *, handler: Callable[[Any], Any] | 
     return promise
 
 
+def is_js_null(value: Any) -> bool:
+    if value is None:
+        return True
+    tname = type(value).__name__
+    return tname in ("JsNull", "JsUndefined") or str(value) == "jsnull"
+
+
+def is_browser_webgpu_available() -> bool:
+    try:
+        from js import navigator
+    except ImportError:
+        return False
+    gpu = getattr(navigator, "gpu", None)
+    return not is_js_null(gpu)
+
+
 def require_browser_webgpu() -> Any:
     try:
         from js import navigator
     except ImportError as exc:
         raise RuntimeError("The js_webgpu backend requires Pyodide.") from exc
     gpu = getattr(navigator, "gpu", None)
-    if gpu is None:
+    if is_js_null(gpu):
         raise RuntimeError("WebGPU is not available in this browser. Use a browser with WebGPU enabled.")
     return gpu
 
