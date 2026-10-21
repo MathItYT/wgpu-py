@@ -1,3 +1,5 @@
+import sys
+
 """
 WebGPU for Python.
 """
@@ -19,6 +21,12 @@ from . import resources
 
 # The API entrypoint, from wgpu.classes - gets replaced when a backend loads.
 gpu = GPU()  # noqa: F405
+
+# Pyodide runs on Emscripten and provides browser-native WebGPU.
+# Select the JS backend automatically there; native installations keep their
+# existing explicit backend loading behavior.
+if sys.platform == "emscripten":
+    from .backends import pyodide as _pyodide_backend
 
 
 def rendercanvas_context_hook(canvas, _):

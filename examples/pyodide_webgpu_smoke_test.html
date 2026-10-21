@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>wgpu-py Pyodide WebGPU smoke test</title></head>
+<body>
+<canvas id="canvas" width="640" height="480"></canvas>
+<script type="module">
+import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v0.29.0/full/pyodide.mjs";
+
+const pyodide = await loadPyodide();
+await pyodide.loadPackage("micropip");
+const wheel = new URL(new URLSearchParams(location.search).get("wheel") || "./dist/wgpu.whl", location.href).href;
+await pyodide.runPythonAsync(`
+import micropip
+await micropip.install("${WGPU_WHEEL_URL}")
+`.replace("${WGPU_WHEEL_URL}", wheel));
+
+await pyodide.runPythonAsync(`
+import wgpu
+from js import document
+from rendercanvas.pyodide import PyodideRenderCanvas
+
+canvas = document.getElementById("canvas")
+render_canvas = PyodideRenderCanvas(canvas, update_mode="continuous")
+context = render_canvas.get_wgpu_context()
+
+adapter = await wgpu.gpu.request_adapter_async()
+device = await adapter.request_device_async()
+
+context.set_physical_size(canvas.width, canvas.height)
+context.configure(device=device, format=wgpu.gpu.get_preferred_canvas_format())
+
+frame = {"n": 0}
+
+@render_canvas.request_draw
+def draw():
+    frame["n"] += 1
+    texture = context.get_current_texture()
+    view = texture.create_view()
+    encoder = device.create_command_encoder()
+    render_pass = encoder.begin_render_pass(
+        color_attachments=[{
+            "view": view,
+            "resolve_target": None,
+            "clear_value": (
+                0.05 + 0.03 * (frame["n"] % 10),
+                0.08,
+                0.12,
+                1.0,
+            ),
+            "load_op": "clear",
+            "store_op": "store",
+        }]
+    )
+    render_pass.end()
+    device.queue.submit([encoder.finish()])
+    context.present()
+
+print("Pyodide rendercanvas WebGPU integration started")
+`);
+</script>
+</body>
+</html>
